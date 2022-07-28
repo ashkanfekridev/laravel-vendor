@@ -7,7 +7,9 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Queue\Factory;
 use Illuminate\Queue\Events\QueueBusy;
 use Illuminate\Support\Collection;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(name: 'queue:monitor')]
 class MonitorCommand extends Command
 {
     /**
@@ -18,6 +20,17 @@ class MonitorCommand extends Command
     protected $signature = 'queue:monitor
                        {queues : The names of the queues to monitor}
                        {--max=1000 : The maximum number of jobs that can be on the queue before an event is dispatched}';
+
+    /**
+     * The name of the console command.
+     *
+     * This name is used to identify the command during lazy loading.
+     *
+     * @var string|null
+     *
+     * @deprecated
+     */
+    protected static $defaultName = 'queue:monitor';
 
     /**
      * The console command description.
@@ -96,7 +109,7 @@ class MonitorCommand extends Command
                 'connection' => $connection,
                 'queue' => $queue,
                 'size' => $size = $this->manager->connection($connection)->size($queue),
-                'status' => $size >= $this->option('max') ? '<fg=red>ALERT</>' : 'OK',
+                'status' => $size >= $this->option('max') ? '<fg=yellow;options=bold>ALERT</>' : '<fg=green;options=bold>OK</>',
             ];
         });
     }
@@ -109,7 +122,17 @@ class MonitorCommand extends Command
      */
     protected function displaySizes(Collection $queues)
     {
-        $this->table($this->headers, $queues);
+        $this->newLine();
+
+        $this->components->twoColumnDetail('<fg=gray>Queue name</>', '<fg=gray>Size / Status</>');
+
+        $queues->each(function ($queue) {
+            $status = '['.$queue['size'].'] '.$queue['status'];
+
+            $this->components->twoColumnDetail($queue['queue'], $status);
+        });
+
+        $this->newLine();
     }
 
     /**
@@ -121,7 +144,7 @@ class MonitorCommand extends Command
     protected function dispatchEvents(Collection $queues)
     {
         foreach ($queues as $queue) {
-            if ($queue['status'] == 'OK') {
+            if ($queue['status'] == '<fg=green;options=bold>OK</>') {
                 continue;
             }
 
